@@ -62,7 +62,7 @@ void OxtsIns::string() {
 }
 
 void OxtsIns::nav_sat_fix(std_msgs::msg::Header header) {
-  header.frame_id = "navsat_link";
+  header.frame_id = this->frame_id;
   auto msg = RosNComWrapper::nav_sat_fix(this->nrx, header);
   pubNavSatFix_->publish(msg);
 }
@@ -71,26 +71,26 @@ void OxtsIns::nav_sat_ref(std_msgs::msg::Header header) {
   // Set the LRF if - we haven't set it before (unless using NCOM LRF)
   this->getLrf();
   if (this->lrf_valid) {
-    header.frame_id = "navsat_link";
+    header.frame_id = this->frame_id;
     auto msg = RosNComWrapper::nav_sat_ref(this->lrf, header);
     pubNavSatRef_->publish(msg);
   }
 }
 
 void OxtsIns::lever_arm_gap(std_msgs::msg::Header header) {
-  header.frame_id = "oxts_link";
+  header.frame_id = this->frame_id;
   auto msg = RosNComWrapper::lever_arm_gap(this->nrx, header);
   pubLeverArm_->publish(msg);
 }
 
 void OxtsIns::imu_bias(std_msgs::msg::Header header) {
-  header.frame_id = "oxts_link";
+  header.frame_id = this->frame_id;
   auto msg = RosNComWrapper::imu_bias(this->nrx, header);
   pubIMUBias_->publish(msg);
 }
 
 void OxtsIns::ecef_pos(std_msgs::msg::Header header) {
-  header.frame_id = "oxts_link";
+  header.frame_id = this->frame_id;
   auto msg = RosNComWrapper::ecef_pos(this->nrx, header);
   pubEcefPos_->publish(msg);
 }
@@ -105,11 +105,11 @@ void OxtsIns::tf(const std_msgs::msg::Header &header) {
   // Set the LRF if - we haven't set it before (unless using NCOM LRF)
   this->getLrf();
   if (this->lrf_valid) {
-    auto odometry = RosNComWrapper::odometry(this->nrx, header, this->lrf);
+    auto odometry = RosNComWrapper::odometry(this->nrx, header, this->lrf, this->frame_id);
     geometry_msgs::msg::TransformStamped tf_oxts;
     tf_oxts.header = header;
     tf_oxts.header.frame_id = this->pub_odometry_frame_id;
-    tf_oxts.child_frame_id = "oxts_link";
+    tf_oxts.child_frame_id = this->frame_id;
     tf_oxts.transform.translation.x = odometry.pose.pose.position.x;
     tf_oxts.transform.translation.y = odometry.pose.pose.position.y;
     tf_oxts.transform.translation.z = odometry.pose.pose.position.z;
@@ -122,7 +122,7 @@ void OxtsIns::tf(const std_msgs::msg::Header &header) {
     if (this->nrx->mIsNoSlipLeverArmXValid) {
       geometry_msgs::msg::TransformStamped tf_vat;
       tf_vat.header = header;
-      tf_vat.header.frame_id = "oxts_link";
+      tf_vat.header.frame_id = this->frame_id;
       tf_vat.child_frame_id = "rear_axle_link";
       tf_vat.transform.translation.x = nsp.x();
       tf_vat.transform.translation.y = nsp.y();
@@ -143,7 +143,7 @@ void OxtsIns::tf(const std_msgs::msg::Header &header) {
 
         geometry_msgs::msg::TransformStamped tf_front_axle;
         tf_front_axle.header = header;
-        tf_front_axle.header.frame_id = "oxts_link";
+        tf_front_axle.header.frame_id = this->frame_id;
         tf_front_axle.child_frame_id = "front_axle_link";
         tf_front_axle.transform.translation.x = nvsp.x();
         tf_front_axle.transform.translation.y = nvsp.y();
@@ -159,7 +159,7 @@ void OxtsIns::tf(const std_msgs::msg::Header &header) {
 }
 
 void OxtsIns::velocity(std_msgs::msg::Header header) {
-  header.frame_id = "oxts_link";
+  header.frame_id = this->frame_id;
   auto msg = RosNComWrapper::velocity(this->nrx, header);
   pubVelocity_->publish(msg);
 }
@@ -169,7 +169,7 @@ void OxtsIns::odometry(std_msgs::msg::Header header) {
   // Set the LRF if - we haven't set it before (unless using NCOM LRF)
   this->getLrf();
   if (this->lrf_valid) {
-    auto msg = RosNComWrapper::odometry(this->nrx, header, this->lrf);
+    auto msg = RosNComWrapper::odometry(this->nrx, header, this->lrf, this->frame_id);
     if (this->pubPathInterval) {
       auto new_pose_stamped = geometry_msgs::msg::PoseStamped();
       new_pose_stamped.header = msg.header;
@@ -187,7 +187,7 @@ void OxtsIns::path(std_msgs::msg::Header header) {
 }
 
 void OxtsIns::time_reference(std_msgs::msg::Header header) {
-  header.frame_id = "oxts_link";
+  header.frame_id = this->frame_id;
   auto msg = RosNComWrapper::time_reference(this->nrx, header);
   pubTimeReference_->publish(msg);
 }

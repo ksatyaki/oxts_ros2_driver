@@ -129,10 +129,8 @@ void OxtsIns::tf(const std_msgs::msg::Header &header) {
     geometry_msgs::msg::TransformStamped tf_world_to_base_link_msg;
     tf_world_to_base_link_msg.header = header;
     tf_world_to_base_link_msg.header.frame_id = this->pub_odometry_frame_id;
-    tf_world_to_base_link_msg.child_frame_id = this->frame_id;
-    tf_world_to_base_link_msg.transform.translation.x = tf_world_to_base_link.getOrigin().getX();
-    tf_world_to_base_link_msg.transform.translation.y = tf_world_to_base_link.getOrigin().getY();
-    tf_world_to_base_link_msg.transform.translation.z = tf_world_to_base_link.getOrigin().getZ();
+    tf_world_to_base_link_msg.child_frame_id = this->base_link_frame_id;
+    tf_world_to_base_link_msg.transform.translation.x = tf_world_to_base_link.getOrigin().getZ();
     tf_world_to_base_link_msg.transform.rotation.x = tf_world_to_base_link.getRotation().getX();
     tf_world_to_base_link_msg.transform.rotation.y = tf_world_to_base_link.getRotation().getY();
     tf_world_to_base_link_msg.transform.rotation.z = tf_world_to_base_link.getRotation().getZ();

@@ -26,8 +26,9 @@ void OxtsIns::ncomCallbackRegular(const oxts_msgs::msg::Ncom::SharedPtr msg) {
     // Publish IMU message if being subscribed to and enabled in config
     if (this->pub_imu_flag)
       this->imu(msg->header);
-    if (this->pub_tf_flag)
-      this->tf(msg->header);
+    if (this->pub_tf_flag) {
+      this->tf_world_to_base_link(msg->header);
+    }
     if (this->pubStringInterval && (sec_idx % this->pubStringInterval == 0))
       this->string();
     if (this->pubNavSatRefInterval &&
@@ -101,28 +102,39 @@ void OxtsIns::imu(std_msgs::msg::Header header) {
   pubImu_->publish(msg);
 }
 
-void OxtsIns::tf(const std_msgs::msg::Header &header) {
-  // Set the LRF if - we haven't set it before (unless using NCOM LRF)
+void OxtsIns::tf_world_to_base_link(const std_msgs::msg::Header &header) {
   this->getLrf();
   if (this->lrf_valid) {
-    auto odometry = RosNComWrapper::odometry(this->nrx, header, this->lrf, this->frame_id);
+    auto odometry =
+        RosNComWrapper::odometry(this->nrx, header, this->lrf, this->frame_id);
     tf2::Transform tf_world_to_oxts;
     tf_world_to_oxts.setOrigin(tf2::Vector3(odometry.pose.pose.position.x,
                                             odometry.pose.pose.position.y,
                                             odometry.pose.pose.position.z));
-    tf_world_to_oxts.setRotation(tf2::Quaternion(odometry.pose.pose.orientation.x, odometry.pose.pose.orientation.y,
-                                                 odometry.pose.pose.orientation.z, odometry.pose.pose.orientation.w));
-
-    auto tf_oxts_to_base_link_msg = this->tf_buffer->lookupTransform(this->frame_id, this->base_link_frame_id, tf2::TimePointZero);
+    tf_world_to_oxts.setRotation(tf2::Quaternion(
+        odometry.pose.pose.orientation.x, odometry.pose.pose.orientation.y,
+        odometry.pose.pose.orientation.z, odometry.pose.pose.orientation.w));
+    geometry_msgs::msg::TransformStamped tf_oxts_to_base_link_msg;
+    try {
+      tf_oxts_to_base_link_msg = this->tf_buffer->lookupTransform(
+          this->frame_id, this->base_link_frame_id, tf2::TimePointZero);
+    } catch (tf2::TransformException &ex) {
+      RCLCPP_ERROR(
+          this->get_logger(), "Could not lookup transform from %s to %s: %s",
+          this->frame_id.c_str(), this->base_link_frame_id.c_str(), ex.what());
+      return;
+    }
 
     tf2::Transform transfrom_oxts_to_base_link;
-    transfrom_oxts_to_base_link.setOrigin(tf2::Vector3(tf_oxts_to_base_link_msg.transform.translation.x,
-                                                       tf_oxts_to_base_link_msg.transform.translation.y,
-                                                       tf_oxts_to_base_link_msg.transform.translation.z));
-    transfrom_oxts_to_base_link.setRotation(tf2::Quaternion(tf_oxts_to_base_link_msg.transform.rotation.x,
-                                                           tf_oxts_to_base_link_msg.transform.rotation.y,
-                                                           tf_oxts_to_base_link_msg.transform.rotation.z,
-                                                           tf_oxts_to_base_link_msg.transform.rotation.w));
+    transfrom_oxts_to_base_link.setOrigin(
+        tf2::Vector3(tf_oxts_to_base_link_msg.transform.translation.x,
+                     tf_oxts_to_base_link_msg.transform.translation.y,
+                     tf_oxts_to_base_link_msg.transform.translation.z));
+    transfrom_oxts_to_base_link.setRotation(
+        tf2::Quaternion(tf_oxts_to_base_link_msg.transform.rotation.x,
+                        tf_oxts_to_base_link_msg.transform.rotation.y,
+                        tf_oxts_to_base_link_msg.transform.rotation.z,
+                        tf_oxts_to_base_link_msg.transform.rotation.w));
 
     auto tf_world_to_base_link = tf_world_to_oxts * transfrom_oxts_to_base_link;
 
@@ -130,15 +142,25 @@ void OxtsIns::tf(const std_msgs::msg::Header &header) {
     tf_world_to_base_link_msg.header = header;
     tf_world_to_base_link_msg.header.frame_id = this->pub_odometry_frame_id;
     tf_world_to_base_link_msg.child_frame_id = this->base_link_frame_id;
-    tf_world_to_base_link_msg.transform.translation.x = tf_world_to_base_link.getOrigin().getZ();
-    tf_world_to_base_link_msg.transform.rotation.x = tf_world_to_base_link.getRotation().getX();
-    tf_world_to_base_link_msg.transform.rotation.y = tf_world_to_base_link.getRotation().getY();
-    tf_world_to_base_link_msg.transform.rotation.z = tf_world_to_base_link.getRotation().getZ();
-    tf_world_to_base_link_msg.transform.rotation.w = tf_world_to_base_link.getRotation().getW();
+    tf_world_to_base_link_msg.transform.translation.x =
+        tf_world_to_base_link.getOrigin().getZ();
+    tf_world_to_base_link_msg.transform.rotation.x =
+        tf_world_to_base_link.getRotation().getX();
+    tf_world_to_base_link_msg.transform.rotation.y =
+        tf_world_to_base_link.getRotation().getY();
+    tf_world_to_base_link_msg.transform.rotation.z =
+        tf_world_to_base_link.getRotation().getZ();
+    tf_world_to_base_link_msg.transform.rotation.w =
+        tf_world_to_base_link.getRotation().getW();
 
     tf_broadcaster_->sendTransform(tf_world_to_base_link_msg);
+  }
+}
 
-
+void OxtsIns::tf(const std_msgs::msg::Header &header) {
+  // Set the LRF if - we haven't set it before (unless using NCOM LRF)
+  this->getLrf();
+  if (this->lrf_valid) {
 
     auto vat = RosNComWrapper::getVat(this->nrx);
     auto nsp = RosNComWrapper::getNsp(this->nrx);
@@ -161,7 +183,8 @@ void OxtsIns::tf(const std_msgs::msg::Header &header) {
       {
         // auto nvsp    = RosNComWrapper::getNvsp(this->nrx);
         /** \todo Make this real */
-        // The transform to create the front axle pose is spoofed with a hardcoded offset, for now.
+        // The transform to create the front axle pose is spoofed with a
+        // hardcoded offset, for now.
         auto nvsp = nsp;
         nvsp += tf2::quatRotate(vat, tf2::Vector3(2.6, 0, 0));
 
@@ -193,7 +216,8 @@ void OxtsIns::odometry(std_msgs::msg::Header header) {
   // Set the LRF if - we haven't set it before (unless using NCOM LRF)
   this->getLrf();
   if (this->lrf_valid) {
-    auto msg = RosNComWrapper::odometry(this->nrx, header, this->lrf, this->frame_id);
+    auto msg =
+        RosNComWrapper::odometry(this->nrx, header, this->lrf, this->frame_id);
     if (this->pubPathInterval) {
       auto new_pose_stamped = geometry_msgs::msg::PoseStamped();
       new_pose_stamped.header = msg.header;
